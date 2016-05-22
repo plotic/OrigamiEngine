@@ -66,7 +66,7 @@ typedef enum : NSInteger {
 /**
  The object that conforms ORGMEngineDelegate protocol and acts as the delegate.
  */
-@property (weak, nonatomic) id<ORGMEngineDelegate> delegate;
+@property (nonatomic, weak) id<ORGMEngineDelegate> delegate;
 
 /**
  Starts new playback process from corresponding source with provided output type of output unit.
@@ -159,6 +159,8 @@ typedef enum : NSInteger {
 - (float)preloadProgress;
 
 - (BOOL)isReadyToPlay;
+
+- (void)clearUnits;
 
 @end
 

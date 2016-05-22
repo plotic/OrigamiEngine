@@ -26,12 +26,24 @@
 @interface FileSource () {
     FILE *_fd;
 }
+
 @property (strong, nonatomic) NSURL *url;
+@property (strong, nonatomic) dispatch_queue_t callback_queue;
+
 @end
 
 @implementation FileSource
 
 @synthesize sourceDelegate;
+
+
+- (instancetype)init{
+    self = [super init];
+    if(self){
+       self.callback_queue = dispatch_queue_create("com.origami.file.source.callback",DISPATCH_QUEUE_SERIAL);
+    }
+    return self;
+}
 
 - (void)dealloc {
 	[self close];
@@ -62,7 +74,7 @@
 	[self setUrl:url];
 	_fd = fopen([[url path] UTF8String], "r");
     BOOL success = (_fd != NULL);
-    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+    dispatch_async(self.callback_queue, ^{
         if(success){
             if([self.sourceDelegate respondsToSelector:@selector(sourceDidReceiveData:)]){
                 [self.sourceDelegate sourceDidReceiveData:self];
@@ -74,8 +86,6 @@
                 [self.sourceDelegate source:self didFailWithError:error];
             }
         }
-        
-        
     });
 	return success;
 }
@@ -101,7 +111,7 @@
 }
 
 - (int)read:(void *)buffer amount:(int)amount {
-	return fread(buffer, 1, amount, _fd);
+	return (int)fread(buffer, 1, amount, _fd);
 }
 
 - (void)close {

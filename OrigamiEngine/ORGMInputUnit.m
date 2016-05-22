@@ -173,14 +173,12 @@
 }
 
 - (int)shiftBytes:(NSUInteger)amount buffer:(void *)buffer {
-    int bytesToRead = MIN(amount, _data.length);
-
+    int bytesToRead = (int)MIN(amount, _data.length);
      __weak typeof (self) weakSelf = self;
     dispatch_sync(self.lock_queue, ^{
         memcpy(buffer, weakSelf.data.bytes, bytesToRead);
         [weakSelf.data replaceBytesInRange:NSMakeRange(0, bytesToRead) withBytes:NULL length:0];
     });
-
     return bytesToRead;
 }
 

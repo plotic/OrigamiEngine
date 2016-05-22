@@ -131,8 +131,7 @@
 }
 
 - (int)shiftBytes:(NSUInteger)amount buffer:(void *)buffer {
-    int bytesToRead = MIN(_convertedData.length, amount);
-
+    int bytesToRead = (int)MIN(_convertedData.length, amount);
     __weak typeof (self) weakSelf = self;
     dispatch_sync(self.inputUnit.lock_queue, ^{
         memcpy(buffer, weakSelf.convertedData.bytes, bytesToRead);

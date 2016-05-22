@@ -217,7 +217,7 @@ const NSTimeInterval readTimeout = 1.0;
         dispatch_semaphore_signal(_downloadingSemaphore);
     }
 
-    if (data && _fileHandle) {
+    if (data && self.fileHandle) {
         dispatch_async([HTTPSource cachingQueue], ^{
             @synchronized(_fileHandle) {
                 [_fileHandle seekToFileOffset:_byteCount];

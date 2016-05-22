@@ -26,12 +26,12 @@
 #import "ORGMInputUnit.h"
 
 @interface ORGMOutputUnit () {
-    AudioUnit outputUnit;
-    AURenderCallbackStruct renderCallback;
+    AudioUnit _outputUnit;
+    AURenderCallbackStruct _renderCallback;
     AudioStreamBasicDescription _format;
     unsigned long long _amountPlayed;
-    
 }
+
 @property (strong, nonatomic) ORGMConverter *converter;
 
 @property (nonatomic,assign,getter=isReadyToPlay)BOOL readyToPlay;
@@ -45,7 +45,7 @@
 - (instancetype)initWithConverter:(ORGMConverter *)converter {
     self = [super init];
     if (self) {
-        outputUnit = NULL;
+        _outputUnit = NULL;
         [self setup];
         self.converter = converter;
         _amountPlayed = 0;
@@ -64,28 +64,40 @@
 }
 
 - (void)process {
-    _isProcessing = YES;
+    NSParameterAssert(_outputUnit!=NULL);
     dispatch_async(dispatch_get_main_queue(), ^{
-        AudioOutputUnitStart(outputUnit);
+        if(_outputUnit!=NULL){
+            AudioOutputUnitStart(_outputUnit);
+            _isProcessing = YES;
+        }
     });
 }
 
 - (void)pause {
-    AudioOutputUnitStop(outputUnit);
+    NSParameterAssert(_outputUnit!=NULL);
+    if(_outputUnit!=NULL){
+        AudioOutputUnitStop(_outputUnit);
+    }
 }
 
 - (void)resume {
-    AudioOutputUnitStart(outputUnit);
+    NSParameterAssert(_outputUnit!=NULL);
+    if(_outputUnit!=NULL){
+        AudioOutputUnitStart(_outputUnit);
+    }
 }
 
 - (void)stop {
-    _isProcessing  = NO;
     self.converter = nil;
-    if (outputUnit) {
-        AudioOutputUnitStop(outputUnit);
-        AudioUnitUninitialize(outputUnit);
-        outputUnit = NULL;
+    NSParameterAssert(_outputUnit!=NULL);
+    if (_outputUnit!=NULL) {
+        if(_isProcessing){
+            AudioOutputUnitStop(_outputUnit);
+        }
+        AudioUnitUninitialize(_outputUnit);
+        _outputUnit = NULL;
     }
+    _isProcessing  = NO;
 }
 
 - (double)framesToSeconds:(double)framesCount {
@@ -101,7 +113,10 @@
 }
 
 - (void)setVolume:(float)volume {
-    AudioUnitSetParameter(outputUnit, kHALOutputParam_Volume, kAudioUnitScope_Global, 0, volume * 0.01f, 0);
+    NSParameterAssert(_outputUnit!=NULL);
+    if (_outputUnit!=NULL) {
+        AudioUnitSetParameter(_outputUnit, kHALOutputParam_Volume, kAudioUnitScope_Global, 0, volume * 0.01f, 0);
+    }
 }
 
 - (void)setReadyToPlay:(BOOL)readyToPlay{
@@ -118,19 +133,22 @@
 - (void)setSampleRate:(double)sampleRate {
     UInt32 size = sizeof(AudioStreamBasicDescription);
     _format.mSampleRate = sampleRate;
-    AudioUnitSetProperty(outputUnit,
-                         kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Output,
-                         0,
-                         &_format,
-                         size);
+    NSParameterAssert(_outputUnit!=NULL);
+    if(_outputUnit!=NULL){
+        AudioUnitSetProperty(_outputUnit,
+                             kAudioUnitProperty_StreamFormat,
+                             kAudioUnitScope_Output,
+                             0,
+                             &_format,
+                             size);
 
-    AudioUnitSetProperty(outputUnit,
-                         kAudioUnitProperty_StreamFormat,
-                         kAudioUnitScope_Input,
-                         0,
-                         &_format,
-                         size);
+        AudioUnitSetProperty(_outputUnit,
+                             kAudioUnitProperty_StreamFormat,
+                             kAudioUnitScope_Input,
+                             0,
+                             &_format,
+                             size);
+    }
     [self setFormat:&_format];
 }
 
@@ -167,12 +185,12 @@ static OSStatus Sound_Renderer(void *inRefCon,
 }
 
 - (BOOL)setup {
-    if (outputUnit) {
+    if (_outputUnit!=NULL) {
         [self stop];
     }
 
     AudioComponentDescription desc;
-    OSStatus err;
+    OSStatus err = 1;
 
     desc.componentType = kAudioUnitType_Output;
 #if __IPHONE_OS_VERSION_MIN_REQUIRED
@@ -189,32 +207,39 @@ static OSStatus Sound_Renderer(void *inRefCon,
         return NO;
     }
 
-    if (AudioComponentInstanceNew(comp, &outputUnit)) {
+    if (AudioComponentInstanceNew(comp, &_outputUnit)) {
+        _outputUnit = NULL;
         return NO;
     }
 
-    if (AudioUnitInitialize(outputUnit) != noErr)
+    if (AudioUnitInitialize(_outputUnit) != noErr){
+        _outputUnit = NULL;
         return NO;
+    }
 
     AudioStreamBasicDescription deviceFormat;
     UInt32 size = sizeof(AudioStreamBasicDescription);
     Boolean outWritable;
-    AudioUnitGetPropertyInfo(outputUnit,
-            kAudioUnitProperty_StreamFormat,
-            kAudioUnitScope_Output,
-            0,
-            &size,
-            &outWritable);
+    
+    if(_outputUnit!=NULL){
+        AudioUnitGetPropertyInfo(_outputUnit,
+                kAudioUnitProperty_StreamFormat,
+                kAudioUnitScope_Output,
+                0,
+                &size,
+                &outWritable);
 
-    err = AudioUnitGetProperty (outputUnit,
-            kAudioUnitProperty_StreamFormat,
-            kAudioUnitScope_Output,
-            0,
-            &deviceFormat,
-            &size);
+        err = AudioUnitGetProperty (_outputUnit,
+                kAudioUnitProperty_StreamFormat,
+                kAudioUnitScope_Output,
+                0,
+                &deviceFormat,
+                &size);
+    }
 
-    if (err != noErr)
+    if (err != noErr){
         return NO;
+    }
 
     deviceFormat.mChannelsPerFrame = 2;
     deviceFormat.mFormatFlags &= ~kLinearPCMFormatFlagIsNonInterleaved;
@@ -229,25 +254,29 @@ static OSStatus Sound_Renderer(void *inRefCon,
         deviceFormat.mBitsPerChannel = 24;
     }
 
-    AudioUnitSetProperty(outputUnit,
-            kAudioUnitProperty_StreamFormat,
-            kAudioUnitScope_Output,
-            0,
-            &deviceFormat,
-            size);
-    AudioUnitSetProperty(outputUnit,
-            kAudioUnitProperty_StreamFormat,
-            kAudioUnitScope_Input,
-            0,
-            &deviceFormat,
-            size);
+    if(_outputUnit!=NULL){
+        AudioUnitSetProperty(_outputUnit,
+                kAudioUnitProperty_StreamFormat,
+                kAudioUnitScope_Output,
+                0,
+                &deviceFormat,
+                size);
+        AudioUnitSetProperty(_outputUnit,
+                kAudioUnitProperty_StreamFormat,
+                kAudioUnitScope_Input,
+                0,
+                &deviceFormat,
+                size);
+    }
 
-    renderCallback.inputProc = Sound_Renderer;
-    renderCallback.inputProcRefCon = (__bridge void * _Nullable)(self);
+    _renderCallback.inputProc = Sound_Renderer;
+    _renderCallback.inputProcRefCon = (__bridge void * _Nullable)(self);
 
-    AudioUnitSetProperty(outputUnit, kAudioUnitProperty_SetRenderCallback,
-            kAudioUnitScope_Input, 0, &renderCallback,
-            sizeof(AURenderCallbackStruct));
+    if(_outputUnit!=NULL){
+        AudioUnitSetProperty(_outputUnit, kAudioUnitProperty_SetRenderCallback,
+                kAudioUnitScope_Input, 0, &_renderCallback,
+                sizeof(AURenderCallbackStruct));
+    }
 
     [self setFormat:&deviceFormat];
     return YES;
