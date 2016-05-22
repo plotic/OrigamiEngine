@@ -43,6 +43,10 @@ typedef enum : NSUInteger {
  */
 @interface ORGMAudioUnit : NSObject
 
+- (void)cancel;
+
+- (BOOL)isCancelled;
+
 /**
  Invokes one processing iteration.
  

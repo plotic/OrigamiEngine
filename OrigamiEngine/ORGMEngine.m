@@ -28,7 +28,9 @@
 #import "ORGMConverter.h"
 #import "ORGMCommonProtocols.h"
 
-@interface ORGMEngine () <ORGMInputUnitDelegate,ORGMOutputUnitDelegate>
+@interface ORGMEngine () <ORGMInputUnitDelegate,ORGMOutputUnitDelegate>{
+    BOOL _cancelled;
+}
 
 @property (strong, nonatomic) ORGMInputUnit *input;
 @property (strong, nonatomic) ORGMOutputUnit *output;
@@ -36,7 +38,7 @@
 @property (assign, nonatomic) ORGMEngineState currentState;
 @property (strong, nonatomic) NSError *currentError;
 @property (assign, nonatomic) float lastPreloadProgress;
-//@property (strong, nonatomic) dispatch_queue_t callback_queue;
+@property (strong, nonatomic) dispatch_queue_t callback_queue;
 @property (strong, nonatomic) dispatch_queue_t processing_queue;
 @property (strong, nonatomic) dispatch_source_t buffering_source;
 
@@ -47,21 +49,22 @@
 - (instancetype)init {
     self = [super init];
     if (self) {
-        //self.callback_queue = dispatch_queue_create("com.origami.callback",DISPATCH_QUEUE_SERIAL);
+        self.callback_queue = dispatch_queue_create("com.origami.callback",DISPATCH_QUEUE_SERIAL);
         self.processing_queue = dispatch_queue_create("com.origami.processing",DISPATCH_QUEUE_SERIAL);
         self.buffering_source = dispatch_source_create(DISPATCH_SOURCE_TYPE_DATA_ADD,0, 0, self.processing_queue);
         dispatch_resume(self.buffering_source);
         self.volume = 100.0f;
         [self setup];
-        _currentState = ORGMEngineStateStopped;
+        _currentState = ORGMEngineStateUnknown;
     }
     return self;
 }
 
 - (void)dealloc {
+    _cancelled = YES;
     self.delegate = nil;
-    [self clearUnits];
-    //self.callback_queue = nil;
+    [self _clearEngine];
+    self.callback_queue = nil;
     self.processing_queue = nil;
     self.buffering_source = nil;
 }
@@ -70,19 +73,23 @@
     if(_currentState!=currentState){
         _currentState = currentState;
         __weak typeof (self) weakSelf = self;
-        //dispatch_async(self.callback_queue, ^{
+        dispatch_async(self.callback_queue, ^{
             if ([weakSelf.delegate respondsToSelector:@selector(engine:didChangeState:)]) {
                 [weakSelf.delegate engine:weakSelf didChangeState:currentState];
             }
-        //});
+        });
     }
 }
 
 #pragma mark - public
 
-- (void)playUrl:(NSURL *)url withOutputUnitClass:(Class)outputUnitClass {
+- (void)playUrl:(NSURL *)url {
+    [self playUrl:url withOutputUnitClass:[ORGMOutputUnit class]];
+}
+
+- (void)_playUrl:(NSURL *)url withOutputUnitClass:(Class)outputUnitClass {
     NSAssert([outputUnitClass isSubclassOfClass:[ORGMOutputUnit class]], @"Output unit should be subclass of ORGMOutputUnit");
-    [self clearUnits];
+    [self _clearEngine];
     self.currentError = nil;
     ORGMInputUnit *input = [[ORGMInputUnit alloc] init];
     self.input = input;
@@ -113,17 +120,20 @@
         return;
     }
     __weak typeof (self) weakSelf = self;
-    //dispatch_async(self.callback_queue, ^{
+    dispatch_async(self.callback_queue, ^{
         if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
             [weakSelf.delegate engine:weakSelf didChangeCurrentURL:url prevItemURL:nil];
         }
-    //});
+    });
     [self setCurrentState:ORGMEngineStatePlaying];
     dispatch_source_merge_data(self.buffering_source, 1);
 }
 
-- (void)playUrl:(NSURL *)url {
-   [self playUrl:url withOutputUnitClass:[ORGMOutputUnit class]];
+- (void)playUrl:(NSURL *)url withOutputUnitClass:(Class)outputUnitClass {
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.processing_queue, ^{
+        [weakSelf _playUrl:url withOutputUnitClass:outputUnitClass];
+    });
 }
 
 - (NSURL *)currentURL{
@@ -138,7 +148,7 @@
     return self.output.isReadyToPlay;
 }
 
-- (void)pause {
+- (void)_pause {
     if (self.currentState != ORGMEngineStatePlaying){
         return;
     }
@@ -146,7 +156,14 @@
     [self setCurrentState:ORGMEngineStatePaused];
 }
 
-- (void)resume {
+- (void)pause {
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.processing_queue, ^{
+        [weakSelf _pause];
+    });
+}
+
+- (void)_resume {
     if (self.currentState != ORGMEngineStatePaused){
         return;
     }
@@ -154,18 +171,45 @@
     [self setCurrentState:ORGMEngineStatePlaying];
 }
 
-- (void)clearUnits{
+- (void)resume {
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.processing_queue, ^{
+        [weakSelf _resume];
+    });
+}
+
+- (void)_clearEngine{
     self.input.inputUnitDelegate = nil;
     self.output.outputUnitDelegate = nil;
     [self.input removeItemStatusObserver];
+    [self.output.converter.inputUnit removeItemStatusObserver];
+    [self.input cancel];
+    [self.converter cancel];
+    [self.output cancel];
+    [self.output stop];
     self.input = nil;
-    self.output = nil;
     self.converter = nil;
+    self.output = nil;
+}
+
+- (void)cancel{
+    _cancelled = YES;
+    __weak typeof (self) weakSelf = self;
+    dispatch_sync(self.processing_queue, ^{
+        [weakSelf _clearEngine];
+    });
+}
+
+- (BOOL)isCancelled{
+    return _cancelled;
 }
 
 - (void)stop {
-    [self clearUnits];
-    [self setCurrentState:ORGMEngineStateStopped];
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.processing_queue, ^{
+        [weakSelf _clearEngine];
+        [weakSelf setCurrentState:ORGMEngineStateStopped];
+    });
 }
 
 - (double)trackTime {
@@ -192,7 +236,7 @@
     [self seekToTime:time withDataFlush:NO];
 }
 
-- (void)setNextUrl:(NSURL *)url withDataFlush:(BOOL)flush {
+- (void)_setNextUrl:(NSURL *)url withDataFlush:(BOOL)flush {
     NSURL *prevURL = self.currentURL;
     if (!url) {
         [self stop];
@@ -209,14 +253,21 @@
             [self.converter reinitWithNewInput:self.input withDataFlush:flush];
             [self.output seek:0.0]; //to reset amount played
              __weak typeof (self) weakSelf = self;
-            //dispatch_async(self.callback_queue, ^{
+            dispatch_async(self.callback_queue, ^{
                 if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
                     [weakSelf.delegate engine:weakSelf didChangeCurrentURL:url prevItemURL:prevURL];
                 }
-            //});
+            });
             [self setCurrentState:ORGMEngineStatePlaying]; //trigger delegate method
         }
     }
+}
+
+- (void)setNextUrl:(NSURL *)url withDataFlush:(BOOL)flush {
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.processing_queue, ^{
+        [weakSelf _setNextUrl:url withDataFlush:flush];
+    });
 }
 
 #pragma mark - private
@@ -225,25 +276,50 @@
                       ofObject:(id)object
                         change:(NSDictionary *)change
                        context:(void *)context {
-     if ([keyPath isEqualToString:@"endOfInput"]) {
-        NSURL *nextUrl = nil;
-        if([self.delegate respondsToSelector:@selector(engineExpectsNextUrl:)]){
-             nextUrl = [self.delegate engineExpectsNextUrl:self];
-        }
-        if (nextUrl==nil) {
-            [self stop];
-        }
-        else{
-            [self setNextUrl:nextUrl withDataFlush:NO];
-        }
+    
+    if(self.isCancelled){
+        return;
+    }
+    
+    if ([keyPath isEqualToString:@"endOfInput"] && object==self.input) {
+        __weak typeof (self) weakSelf = self;
+        dispatch_async(self.processing_queue, ^{
+            [weakSelf _endOfInput];
+        });
+    }
+}
+
+- (void)_endOfInput{
+    if(self.isCancelled){
+        return;
+    }
+    NSURL *nextUrl = nil;
+    if([self.delegate respondsToSelector:@selector(engineExpectsNextUrl:)]){
+        nextUrl = [self.delegate engineExpectsNextUrl:self];
+    }
+    if (nextUrl==nil) {
+        __weak typeof (self) weakSelf = self;
+        dispatch_async(self.callback_queue, ^{
+            if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
+                [weakSelf.delegate engine:weakSelf didChangeCurrentURL:nil prevItemURL:self.currentURL];
+            }
+        });
+        [self stop];
+    }
+    else{
+        [self setNextUrl:nextUrl withDataFlush:NO];
     }
 }
 
 - (void)setup {
     __weak typeof (self) weakSelf = self;
     dispatch_source_set_event_handler(self.buffering_source, ^{
-        [weakSelf.input process];
-        [weakSelf.converter process];
+        if(weakSelf.input.isCancelled==NO){
+            [weakSelf.input process];
+        }
+        if(weakSelf.converter.isCancelled==NO){
+            [weakSelf.converter process];
+        }
     });
 }
 
@@ -256,33 +332,33 @@
     if( unit==self.input && (ABS(_lastPreloadProgress-progress)>0.05 || (fabs(progress - 1.0) < FLT_EPSILON) || (fabs(progress) < FLT_EPSILON))){
         _lastPreloadProgress = progress;
         __weak typeof (self) weakSelf = self;
-        //dispatch_async(self.callback_queue, ^{
+        dispatch_async(self.callback_queue, ^{
             if([weakSelf.delegate respondsToSelector:@selector(engine:didChangePreloadProgress:)]){
                 [weakSelf.delegate engine:weakSelf didChangePreloadProgress:progress];
             }
-        //});
+        });
     }
 }
 
 - (void)inputUnit:(ORGMInputUnit *)unit didFailWithError:(NSError *)error{
     if(unit==self.input){
         __weak typeof (self) weakSelf = self;
-        //dispatch_async(self.callback_queue, ^{
+        dispatch_async(self.callback_queue, ^{
             if([weakSelf.delegate respondsToSelector:@selector(engine:didFailCurrentItemWithError:)]){
                 [weakSelf.delegate engine:weakSelf didFailCurrentItemWithError:error];
             }
-        //});
+        });
     }
 }
 
 - (void)outputUnit:(ORGMOutputUnit *)unit didChangeReadyToPlay:(BOOL)readyToPlay{
     if(unit==self.output){
         __weak typeof (self) weakSelf = self;
-        //dispatch_async(self.callback_queue, ^{
+        dispatch_async(self.callback_queue, ^{
             if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeReadyToPlay:)]){
                 [weakSelf.delegate engine:weakSelf didChangeReadyToPlay:readyToPlay];
             }
-        //});
+        });
     }
 }
 

@@ -23,18 +23,26 @@
 
 #import "ORGMAudioUnit.h"
 
-@interface ORGMAudioUnit ()
+@interface ORGMAudioUnit (){
+    BOOL _cancelled;
+}
+
 @property (nonatomic) BOOL isProcessing;
+
 @end
 
 @implementation ORGMAudioUnit
+
 - (void)process {
-    NSString *error = [NSString stringWithFormat:
-                       NSLocalizedString(@"You must override %@ in a subclass", nil),
-                       NSStringFromSelector(_cmd)];
-    @throw [NSException exceptionWithName:NSInternalInconsistencyException
-                                   reason:error
-                                 userInfo:nil];
+    NSAssert(NO, @"n/a");
+}
+
+- (void)cancel{
+   _cancelled = YES;
+}
+
+- (BOOL)isCancelled{
+    return _cancelled;
 }
 
 AudioStreamBasicDescription propertiesToASBD(NSDictionary *properties) {

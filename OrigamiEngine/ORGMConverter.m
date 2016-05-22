@@ -100,8 +100,16 @@
 }
 
 - (void)process {
+    
+    if(self.isCancelled){
+        return;
+    }
+    
     int amountConverted = 0;
     do {
+        if(self.isCancelled){
+            break;
+        }
         if (_convertedData.length >= BUFFER_SIZE) {
             break;
         }
@@ -131,6 +139,9 @@
 }
 
 - (int)shiftBytes:(NSUInteger)amount buffer:(void *)buffer {
+    if(self.isCancelled){
+        return 0;
+    }
     int bytesToRead = (int)MIN(_convertedData.length, amount);
     __weak typeof (self) weakSelf = self;
     dispatch_sync(self.inputUnit.lock_queue, ^{

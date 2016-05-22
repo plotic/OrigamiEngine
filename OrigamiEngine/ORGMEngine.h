@@ -30,7 +30,8 @@
  Specifies states of the engine.
  */
 typedef enum : NSInteger {
-    ORGMEngineStateStopped = 0,
+    ORGMEngineStateUnknown = 0,
+    ORGMEngineStateStopped,
     ORGMEngineStatePlaying,
     ORGMEngineStatePaused,
     ORGMEngineStateError
@@ -160,7 +161,7 @@ typedef enum : NSInteger {
 
 - (BOOL)isReadyToPlay;
 
-- (void)clearUnits;
+- (void)cancel;
 
 @end
 

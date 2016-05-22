@@ -64,6 +64,11 @@
 }
 
 - (void)process {
+    
+    if(self.isCancelled){
+        return;
+    }
+    
     NSParameterAssert(_outputUnit!=NULL);
     dispatch_async(dispatch_get_main_queue(), ^{
         if(_outputUnit!=NULL){
@@ -89,7 +94,6 @@
 
 - (void)stop {
     self.converter = nil;
-    NSParameterAssert(_outputUnit!=NULL);
     if (_outputUnit!=NULL) {
         if(_isProcessing){
             AudioOutputUnitStop(_outputUnit);
@@ -160,7 +164,13 @@ static OSStatus Sound_Renderer(void *inRefCon,
                                UInt32 inBusNumber,
                                UInt32 inNumberFrames,
                                AudioBufferList  *ioData) {
+    
     ORGMOutputUnit *output = (__bridge ORGMOutputUnit *)inRefCon;
+    
+    if(output.isCancelled){
+        return errSecUserCanceled;
+    }
+    
     OSStatus err = noErr;
     void *readPointer = ioData->mBuffers[0].mData;
 
@@ -283,6 +293,9 @@ static OSStatus Sound_Renderer(void *inRefCon,
 }
 
 - (int)readData:(void *)ptr amount:(int)amount {
+    if(self.isCancelled){
+        return 0;
+    }
     NSAssert(self.converter, @"Converter is undefined");
     if (self.converter) {
         int bytesRead = [_converter shiftBytes:amount buffer:ptr];

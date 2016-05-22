@@ -101,11 +101,21 @@
 }
 
 - (void)process {
+    
+    if(self.isCancelled){
+        return;
+    }
+    
     _isProcessing = YES;
     int amountInBuffer = 0;
     int framesRead = 0;
 
     do {
+        
+        if(self.isCancelled){
+            return;
+        }
+        
         if (_data.length >= BUFFER_SIZE) {
             framesRead = 1;
             break;
@@ -128,7 +138,7 @@
         });
     } while (framesRead > 0);
 
-    if (framesRead <= 0) {
+    if (framesRead <= 0 && self.isCancelled==NO) {
         [self setEndOfInput:YES];
     }
 

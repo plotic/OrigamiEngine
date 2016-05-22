@@ -40,7 +40,7 @@
 - (instancetype)init{
     self = [super init];
     if(self){
-       self.callback_queue = dispatch_queue_create("com.origami.file.source.callback",DISPATCH_QUEUE_SERIAL);
+       //self.callback_queue = dispatch_queue_create("com.origami.file.source.callback",DISPATCH_QUEUE_SERIAL);
     }
     return self;
 }
@@ -74,7 +74,7 @@
 	[self setUrl:url];
 	_fd = fopen([[url path] UTF8String], "r");
     BOOL success = (_fd != NULL);
-    dispatch_async(self.callback_queue, ^{
+    //dispatch_async(self.callback_queue, ^{
         if(success){
             if([self.sourceDelegate respondsToSelector:@selector(sourceDidReceiveData:)]){
                 [self.sourceDelegate sourceDidReceiveData:self];
@@ -86,7 +86,7 @@
                 [self.sourceDelegate source:self didFailWithError:error];
             }
         }
-    });
+    //});
 	return success;
 }
 
