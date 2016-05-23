@@ -40,7 +40,7 @@
 - (instancetype)init{
     self = [super init];
     if(self){
-       //self.callback_queue = dispatch_queue_create("com.origami.file.source.callback",DISPATCH_QUEUE_SERIAL);
+       self.callback_queue = dispatch_queue_create("com.origami.file.source.callback",DISPATCH_QUEUE_SERIAL);
     }
     return self;
 }
@@ -63,30 +63,34 @@
 }
 
 - (long)size {
-    long curpos = ftell(_fd);
-    fseek (_fd, 0, SEEK_END);
-    long size = ftell(_fd);
-    fseek(_fd, curpos, SEEK_SET);
-	return size;
+    if(_fd!=NULL){
+        long curpos = ftell(_fd);
+        fseek (_fd, 0, SEEK_END);
+        long size = ftell(_fd);
+        fseek(_fd, curpos, SEEK_SET);
+        return size;
+    }
+    return 0;
 }
 
 - (BOOL)open:(NSURL *)url {
 	[self setUrl:url];
 	_fd = fopen([[url path] UTF8String], "r");
     BOOL success = (_fd != NULL);
-    //dispatch_async(self.callback_queue, ^{
+    __weak typeof (self) weakSelf = self;
+    dispatch_async(self.callback_queue, ^{
         if(success){
-            if([self.sourceDelegate respondsToSelector:@selector(sourceDidReceiveData:)]){
-                [self.sourceDelegate sourceDidReceiveData:self];
+            if([weakSelf.sourceDelegate respondsToSelector:@selector(sourceDidReceiveData:)]){
+                [weakSelf.sourceDelegate sourceDidReceiveData:weakSelf];
             }
         }
         else{
             NSError *error = [[NSError alloc] initWithDomain:@"FileSourceErrorDomain" code:-1 userInfo:nil];
-            if([self.sourceDelegate respondsToSelector:@selector(source:didFailWithError:)]){
-                [self.sourceDelegate source:self didFailWithError:error];
+            if([weakSelf.sourceDelegate respondsToSelector:@selector(source:didFailWithError:)]){
+                [weakSelf.sourceDelegate source:weakSelf didFailWithError:error];
             }
         }
-    //});
+    });
 	return success;
 }
 
@@ -99,11 +103,17 @@
 }
 
 - (BOOL)seek:(long)position whence:(int)whence {
-	return (fseek(_fd, position, whence) == 0);
+    if(_fd!=NULL){
+        return (fseek(_fd, position, whence) == 0);
+    }
+    return NO;
 }
 
 - (long)tell {
-    return ftell(_fd);
+    if(_fd!=NULL){
+        return ftell(_fd);
+    }
+    return 0;
 }
 
 - (long)preloadSize{
@@ -111,7 +121,10 @@
 }
 
 - (int)read:(void *)buffer amount:(int)amount {
-	return (int)fread(buffer, 1, amount, _fd);
+    if(_fd!=NULL){
+        return (int)fread(buffer, 1, amount, _fd);
+    }
+    return 0;
 }
 
 - (void)close {

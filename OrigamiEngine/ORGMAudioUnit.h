@@ -67,4 +67,5 @@ typedef enum : NSUInteger {
  @return A new ASBD struct.
  */
 AudioStreamBasicDescription propertiesToASBD(NSDictionary *properties);
+
 @end

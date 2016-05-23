@@ -35,6 +35,8 @@
 
 - (void)inputUnit:(ORGMInputUnit *)unit  didFailWithError:(NSError *)error;
 
+- (void)inputUnitDidEndOfInput:(ORGMInputUnit *)unit;
+
 @end
 
 
@@ -50,7 +52,7 @@
 /**
  A flag that determines if instance is currently decoding data.
  */
-@property (assign, nonatomic, readonly) BOOL isProcessing;
+- (BOOL)isProcessing;
 
 /**
  A flag determines that all input data decoded.
@@ -119,15 +121,10 @@
  */
 - (int)shiftBytes:(NSUInteger)amount buffer:(void *)buffer;
 
-
 //extra
 
 - (NSURL *)currentURL;
 
 - (float)preloadProgress;
-
-- (void)addItemStatusObserver:(NSObject *)observer forKeyPaths:(NSSet *)keyPaths options:(NSKeyValueObservingOptions)options;
-
-- (void)removeItemStatusObserver;
 
 @end

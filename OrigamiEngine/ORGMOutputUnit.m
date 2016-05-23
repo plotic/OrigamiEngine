@@ -30,6 +30,8 @@
     AURenderCallbackStruct _renderCallback;
     AudioStreamBasicDescription _format;
     unsigned long long _amountPlayed;
+    BOOL _processing;
+   
 }
 
 @property (strong, nonatomic) ORGMConverter *converter;
@@ -49,6 +51,7 @@
         [self setup];
         self.converter = converter;
         _amountPlayed = 0;
+        _processing = NO;
     }
     return self;
 }
@@ -63,6 +66,10 @@
     return _format;
 }
 
+- (BOOL)isProcessing{
+    return _processing;
+}
+
 - (void)process {
     
     if(self.isCancelled){
@@ -70,12 +77,12 @@
     }
     
     NSParameterAssert(_outputUnit!=NULL);
-    dispatch_async(dispatch_get_main_queue(), ^{
+    //dispatch_async(dispatch_get_main_queue(), ^{
         if(_outputUnit!=NULL){
             AudioOutputUnitStart(_outputUnit);
-            _isProcessing = YES;
+            _processing = YES;
         }
-    });
+    //});
 }
 
 - (void)pause {
@@ -95,13 +102,13 @@
 - (void)stop {
     self.converter = nil;
     if (_outputUnit!=NULL) {
-        if(_isProcessing){
+        if(_processing){
             AudioOutputUnitStop(_outputUnit);
         }
         AudioUnitUninitialize(_outputUnit);
         _outputUnit = NULL;
     }
-    _isProcessing  = NO;
+    _processing = NO;
 }
 
 - (double)framesToSeconds:(double)framesCount {
@@ -126,7 +133,7 @@
 - (void)setReadyToPlay:(BOOL)readyToPlay{
     if(_readyToPlay!=readyToPlay){
         _readyToPlay = readyToPlay;
-        if(self.outputUnitDelegate && _isProcessing){
+        if(self.outputUnitDelegate && _processing){
             if([self.outputUnitDelegate respondsToSelector:@selector(outputUnit:didChangeReadyToPlay:)]){
                 [self.outputUnitDelegate outputUnit:self didChangeReadyToPlay:readyToPlay];
             }
@@ -195,6 +202,7 @@ static OSStatus Sound_Renderer(void *inRefCon,
 }
 
 - (BOOL)setup {
+    
     if (_outputUnit!=NULL) {
         [self stop];
     }
@@ -296,7 +304,6 @@ static OSStatus Sound_Renderer(void *inRefCon,
     if(self.isCancelled){
         return 0;
     }
-    NSAssert(self.converter, @"Converter is undefined");
     if (self.converter) {
         int bytesRead = [_converter shiftBytes:amount buffer:ptr];
         _amountPlayed += bytesRead;

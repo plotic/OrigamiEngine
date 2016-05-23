@@ -47,7 +47,7 @@
 /**
  A flag that determines if instance is currently active.
  */
-@property (assign, nonatomic, readonly) BOOL isProcessing;
+- (BOOL)isProcessing;
 
 /**
  Engine output format

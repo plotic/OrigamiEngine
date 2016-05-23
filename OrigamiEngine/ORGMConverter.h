@@ -83,4 +83,5 @@
  Flushes current data accumulated in converter's buffer.
  */
 - (void)flushBuffer;
+
 @end

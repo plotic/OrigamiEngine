@@ -29,9 +29,9 @@
     int bytesPerFrame;
     BOOL _shouldSeek;
     long seekFrame;
+    BOOL _processing;
 }
 
-@property (nonatomic,strong) NSMapTable *observerInfo;
 @property (strong, nonatomic) NSMutableData *data;
 @property (strong, nonatomic) id<ORGMSource> source;
 @property (strong, nonatomic) id<ORGMDecoder> decoder;
@@ -51,16 +51,21 @@
         self.data = [[NSMutableData alloc] init];
         self.inputBuffer = malloc(CHUNK_SIZE);
         _endOfInput = NO;
+        _processing = NO;
     }
     return self;
 }
 
 - (void)dealloc {
-    [self removeItemStatusObserver];
+    self.inputUnitDelegate = nil;
     [self close];
     free(self.inputBuffer);
     self.source.sourceDelegate = nil;
     self.url = nil;
+}
+
+- (BOOL)isProcessing{
+    return _processing;
 }
 
 #pragma mark - public
@@ -106,13 +111,15 @@
         return;
     }
     
-    _isProcessing = YES;
+    _processing = YES;
+    
     int amountInBuffer = 0;
     int framesRead = 0;
 
     do {
         
         if(self.isCancelled){
+            _processing = NO;
             return;
         }
         
@@ -136,13 +143,16 @@
         dispatch_sync(self.lock_queue, ^{
             [weakSelf.data appendBytes:weakSelf.inputBuffer length:amountInBuffer];
         });
-    } while (framesRead > 0);
+    } while (framesRead > 0 && self.isCancelled==NO);
 
     if (framesRead <= 0 && self.isCancelled==NO) {
         [self setEndOfInput:YES];
+        if([self.inputUnitDelegate respondsToSelector:@selector(inputUnitDidEndOfInput:)]){
+            [self.inputUnitDelegate inputUnitDidEndOfInput:self];
+        }
     }
 
-    _isProcessing = NO;
+    _processing = NO;
 }
 
 - (double)framesCount {
@@ -190,35 +200,6 @@
         [weakSelf.data replaceBytesInRange:NSMakeRange(0, bytesToRead) withBytes:NULL length:0];
     });
     return bytesToRead;
-}
-
-- (void)addItemStatusObserver:(NSObject *)observer forKeyPaths:(NSSet *)keyPaths options:(NSKeyValueObservingOptions)options{
-    @synchronized(self) {
-        if(self.observerInfo){
-            [self removeItemStatusObserver];
-        }
-        self.observerInfo = [NSMapTable mapTableWithKeyOptions:NSPointerFunctionsStrongMemory valueOptions:NSPointerFunctionsWeakMemory];
-        [keyPaths enumerateObjectsUsingBlock:^(NSString *key, BOOL *stop) {
-            @try {[self addObserver:observer forKeyPath:key options:options context:NULL];}@catch (NSException *exception) {}
-            [self.observerInfo setObject:observer forKey:key];
-        }];
-    }
-}
-
-- (void)removeItemStatusObserver{
-    @synchronized(self) {
-        if(self.observerInfo){
-            NSArray *keys = [[self.observerInfo keyEnumerator] allObjects];
-            for (NSString *key in keys) {
-                id value = [self.observerInfo objectForKey:key];
-                NSParameterAssert(value);
-                if(value){
-                    @try {[self removeObserver:value forKeyPath:key]; }@catch (NSException *exception) {}
-                }
-            }
-            self.observerInfo = nil;
-        }
-    }
 }
 
 #pragma mark - private

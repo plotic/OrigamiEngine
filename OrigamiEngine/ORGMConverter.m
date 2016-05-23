@@ -118,8 +118,12 @@
         dispatch_sync(self.inputUnit.lock_queue, ^{
             [weakSelf.convertedData appendBytes:weakSelf.writeBuf length:amountConverted];
         });
-    } while (amountConverted > 0);
+    } while (amountConverted > 0 && self.isCancelled==NO);
 
+    if(self.isCancelled){
+        return;
+    }
+    
     if (!_outputUnit.isProcessing) {
         if (_convertedData.length < BUFFER_SIZE) {
             dispatch_source_merge_data(self.buffering_source, 1);
@@ -153,6 +157,9 @@
 }
 
 - (BOOL)isReadyForBuffering {
+    if(self.isCancelled){
+        return NO;
+    }
     return (_convertedData.length <= 0.5*BUFFER_SIZE && !_inputUnit.isProcessing);
 }
 
@@ -166,6 +173,11 @@
 #pragma mark - private
 
 - (int)convert:(void *)dest amount:(int)amount {
+    
+    if(self.isCancelled){
+        return 0;
+    }
+    
     AudioBufferList ioData;
     UInt32 ioNumberFrames;
     OSStatus err;
@@ -189,8 +201,14 @@ static OSStatus ACInputProc(AudioConverterRef inAudioConverter,
                             UInt32* ioNumberDataPackets, AudioBufferList* ioData,
                             AudioStreamPacketDescription** outDataPacketDescription,
                             void* inUserData) {
+    
     ORGMConverter *converter = (__bridge ORGMConverter *)inUserData;
     OSStatus err = noErr;
+    
+    if(converter.isCancelled){
+        return errSecUserCanceled;
+    }
+    
     int amountToWrite;
 
     amountToWrite = [converter.inputUnit shiftBytes:(*ioNumberDataPackets)*(converter->_inputFormat.mBytesPerPacket)
