@@ -77,7 +77,7 @@
     if (!self.source || ![self.source open:url]){
         return NO;
     }
-    self.decoder = [[ORGMPluginManager sharedManager] decoderForSource:_source error:nil];
+    self.decoder = [[ORGMPluginManager sharedManager] decoderForSource:self.source error:nil];
     if (!self.decoder || ![self.decoder open:self.source]){
         return NO;
     }
