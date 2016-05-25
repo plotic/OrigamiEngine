@@ -161,7 +161,7 @@ typedef enum : NSInteger {
 
 - (BOOL)isReadyToPlay;
 
-- (void)cancel;
+- (void)cancelAllAndClearEngine;
 
 @end
 

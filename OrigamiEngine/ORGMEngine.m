@@ -203,12 +203,9 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     self.output = nil;
 }
 
-- (void)cancel{
+- (void)cancelAllAndClearEngine{
     _cancelled = YES;
-    __weak typeof (self) weakSelf = self;
-    dispatch_sync(self.processing_queue, ^{
-        [weakSelf _clearEngine];
-    });
+    [self _clearEngine];
 }
 
 - (BOOL)isCancelled{
