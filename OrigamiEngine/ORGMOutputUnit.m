@@ -161,6 +161,10 @@
                              size);
     }
     [self setFormat:&_format];
+    
+    if([self.outputUnitDelegate respondsToSelector:@selector(outputUnit:didChangeSampleRate:)]){
+        [self.outputUnitDelegate outputUnit:self didChangeSampleRate:sampleRate];
+    }
 }
 
 #pragma mark - callbacks
@@ -179,6 +183,7 @@ static OSStatus Sound_Renderer(void *inRefCon,
     }
     
     OSStatus err = noErr;
+
     void *readPointer = ioData->mBuffers[0].mData;
 
     int amountToRead, amountRead;
@@ -198,6 +203,12 @@ static OSStatus Sound_Renderer(void *inRefCon,
     ioData->mBuffers[0].mNumberChannels = output->_format.mChannelsPerFrame;
     ioData->mNumberBuffers = 1;
 
+    @autoreleasepool {
+        if([output.outputUnitDelegate respondsToSelector:@selector(outputUnit:didRenderSound:flags:timeStamp:busNumber:numberFrames:bufferList:)]){
+            [output.outputUnitDelegate outputUnit:output didRenderSound:inRefCon flags:ioActionFlags timeStamp:inTimeStamp busNumber:inBusNumber numberFrames:inNumberFrames bufferList:ioData];
+        }
+    }
+    
     return err;
 }
 

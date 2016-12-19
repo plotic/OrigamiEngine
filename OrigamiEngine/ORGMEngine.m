@@ -367,6 +367,18 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     }
 }
 
+- (void)outputUnit:(ORGMOutputUnit *)unit didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData{
+    if([self.delegate respondsToSelector:@selector(engine:didRenderSound:flags:timeStamp:busNumber:numberFrames:bufferList:)]){
+        [self.delegate engine:self didRenderSound:inRefCon flags:ioActionFlags timeStamp:inTimeStamp busNumber:inBusNumber numberFrames:inNumberFrames bufferList:ioData];
+    }
+}
+
+- (void)outputUnit:(ORGMOutputUnit *)unit didChangeSampleRate:(double)sampleRate{
+    if([self.delegate respondsToSelector:@selector(engine:didChangeSampleRate:)]){
+        [self.delegate engine:self didChangeSampleRate:sampleRate];
+    }
+}
+
 - (void)inputUnitDidEndOfInput:(ORGMInputUnit *)unit{
     unit.inputUnitDelegate = nil;
     if(self.isCancelled || _bufferingSourceHandlerState!=ORGMEngineBufferingSourceStateActive){

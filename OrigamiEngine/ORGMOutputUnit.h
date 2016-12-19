@@ -33,6 +33,10 @@
 
 - (void)outputUnit:(ORGMOutputUnit *)unit didChangeReadyToPlay:(BOOL)readyToPlay;
 
+- (void)outputUnit:(ORGMOutputUnit *)unit didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData;
+
+- (void)outputUnit:(ORGMOutputUnit *)unit didChangeSampleRate:(double)sampleRate;
+    
 @end
 
 

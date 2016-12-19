@@ -198,4 +198,8 @@ typedef enum : NSInteger {
 
 - (void)engine:(ORGMEngine *)engine didChangeCurrentURL:(NSURL *)currentURL prevItemURL:(NSURL *)prevURL;
 
+- (void)engine:(ORGMEngine *)engine didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData;
+
+- (void)engine:(ORGMEngine *)engine didChangeSampleRate:(double)sampleRate;
+
 @end
