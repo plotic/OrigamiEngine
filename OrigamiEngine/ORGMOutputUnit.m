@@ -22,7 +22,6 @@
 // THE SOFTWARE.
 
 #import "ORGMOutputUnit.h"
-
 #import "ORGMInputUnit.h"
 
 @interface ORGMOutputUnit () {
@@ -52,6 +51,7 @@
         self.converter = converter;
         _amountPlayed = 0;
         _processing = NO;
+
     }
     return self;
 }
@@ -162,9 +162,10 @@
     }
     [self setFormat:&_format];
     
-    if([self.outputUnitDelegate respondsToSelector:@selector(outputUnit:didChangeSampleRate:)]){
-        [self.outputUnitDelegate outputUnit:self didChangeSampleRate:sampleRate];
+    if(self.didChangeSampleRateBlock){
+        self.didChangeSampleRateBlock(sampleRate);
     }
+    
 }
 
 #pragma mark - callbacks
@@ -202,13 +203,11 @@ static OSStatus Sound_Renderer(void *inRefCon,
     ioData->mBuffers[0].mDataByteSize = amountRead;
     ioData->mBuffers[0].mNumberChannels = output->_format.mChannelsPerFrame;
     ioData->mNumberBuffers = 1;
-
-    @autoreleasepool {
-        if([output.outputUnitDelegate respondsToSelector:@selector(outputUnit:didRenderSound:flags:timeStamp:busNumber:numberFrames:bufferList:)]){
-            [output.outputUnitDelegate outputUnit:output didRenderSound:inRefCon flags:ioActionFlags timeStamp:inTimeStamp busNumber:inBusNumber numberFrames:inNumberFrames bufferList:ioData];
-        }
-    }
     
+    if(output.didRenderSoundBlock){
+        output.didRenderSoundBlock(output,ioActionFlags,inTimeStamp,inBusNumber,inNumberFrames,ioData);
+    }
+
     return err;
 }
 
@@ -270,13 +269,16 @@ static OSStatus Sound_Renderer(void *inRefCon,
         return NO;
     }
 
+    
     deviceFormat.mChannelsPerFrame = 2;
+    
     deviceFormat.mFormatFlags &= ~kLinearPCMFormatFlagIsNonInterleaved;
     deviceFormat.mFormatFlags &= ~kLinearPCMFormatFlagIsFloat;
     deviceFormat.mFormatFlags = kLinearPCMFormatFlagIsSignedInteger;
+    
     deviceFormat.mBytesPerFrame = deviceFormat.mChannelsPerFrame*(deviceFormat.mBitsPerChannel/8);
     deviceFormat.mBytesPerPacket = deviceFormat.mBytesPerFrame * deviceFormat.mFramesPerPacket;
-
+    
     if (_outputFormat == ORGMOutputFormat24bit) {
         deviceFormat.mBytesPerFrame = 6;
         deviceFormat.mBytesPerPacket = 6;

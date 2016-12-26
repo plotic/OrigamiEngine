@@ -38,7 +38,7 @@
     long totalFrames;
 }
 
-@property (strong, nonatomic) NSMutableDictionary *metadata;
+@property (strong, nonatomic) NSMutableDictionary *decoderMetadata;
 @property (strong, nonatomic) id<ORGMSource> source;
 @property (assign, nonatomic) BOOL endOfStream;
 
@@ -73,8 +73,8 @@
             nil];
 }
 
-- (NSMutableDictionary *)metadata {
-    return _metadata;
+- (NSDictionary *)metadata {
+    return self.decoderMetadata;
 }
 
 - (int)readAudio:(void *)buffer frames:(UInt32)frames {
@@ -116,7 +116,7 @@
 - (BOOL)open:(id<ORGMSource>)s {
 	[self setSource:s];
 	
-    self.metadata = [NSMutableDictionary dictionary];
+    self.decoderMetadata = [NSMutableDictionary dictionary];
 	decoder = FLAC__stream_decoder_new();
 	if (decoder == NULL) {
 		return NO;
@@ -328,14 +328,14 @@ void MetadataCallback(const FLAC__StreamDecoder *decoder,
             NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
             NSString *value = [commentValue substringWithRange:NSMakeRange(range.location + 1,
                                                                            commentValue.length - range.location - 1)];
-            [flacDecoder.metadata setObject:value forKey:[key lowercaseString]];
+            [flacDecoder.decoderMetadata setObject:value forKey:[key lowercaseString]];
         }
     } else if (metadata->type == FLAC__METADATA_TYPE_PICTURE) {
         FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
         FLAC__StreamMetadata_Picture picture = metadata->data.picture;
         NSData *picture_data = [NSData dataWithBytes:picture.data
                                               length:picture.data_length];
-        [flacDecoder.metadata setObject:picture_data forKey:@"picture"];
+        [flacDecoder.decoderMetadata setObject:picture_data forKey:@"picture"];
     } else if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
         FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
 

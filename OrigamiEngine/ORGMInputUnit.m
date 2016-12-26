@@ -30,6 +30,8 @@
     BOOL _shouldSeek;
     long seekFrame;
     BOOL _processing;
+    NSDictionary *_decoderMetadata;
+    NSMutableDictionary *_inputUnitMetadata;
 }
 
 @property (strong, nonatomic) NSMutableData *data;
@@ -179,17 +181,42 @@
     return propertiesToASBD(_decoder.properties);
 }
 
+- (NSDictionary *)decoderMetadata{
+    if(_decoderMetadata==nil ){
+        @try {
+            NSDictionary *meta = [self.decoder metadata];
+            if([meta count]>0){
+                _decoderMetadata = meta;
+            }
+        } @catch (NSException *exception) {}
+    }
+    return _decoderMetadata;
+}
+
+- (NSMutableDictionary *)inputUnitMetadata{
+    if(_inputUnitMetadata==nil && self.decoderMetadata){
+        _inputUnitMetadata = [[NSMutableDictionary alloc] init];
+        @try {
+            NSDictionary *decoderMetadata = self.decoderMetadata;
+            if(decoderMetadata.count>0){
+                [_inputUnitMetadata addEntriesFromDictionary:decoderMetadata];
+            }
+        } @catch (NSException *exception) {
+            _inputUnitMetadata = nil;
+        }
+    }
+    return _inputUnitMetadata;
+}
+
 - (NSDictionary *)metadata {
-    NSMutableDictionary *dict = [[NSMutableDictionary alloc] init];
-    NSDictionary *commonMeta = [[_decoder metadata] copy];
-    if(commonMeta.count>0){
-        [dict addEntriesFromDictionary:commonMeta];
+    NSMutableDictionary *inputUnitMetadata = [self inputUnitMetadata];
+    if(inputUnitMetadata){
+        if(fabs(self.format.mSampleRate)>FLT_EPSILON){
+            double trackDuration = self.framesCount/self.format.mSampleRate;
+            [inputUnitMetadata setObject:@(trackDuration) forKey:@"duration"];
+        }
     }
-    if(fabs(self.format.mSampleRate)>FLT_EPSILON){
-        double trackDuration = self.framesCount/self.format.mSampleRate;
-        [dict setObject:@(trackDuration) forKey:@"duration"];
-    }
-    return dict;
+    return inputUnitMetadata;
 }
 
 - (int)shiftBytes:(NSUInteger)amount buffer:(void *)buffer {

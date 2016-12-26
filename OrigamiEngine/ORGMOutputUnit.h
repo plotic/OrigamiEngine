@@ -32,19 +32,22 @@
 @optional
 
 - (void)outputUnit:(ORGMOutputUnit *)unit didChangeReadyToPlay:(BOOL)readyToPlay;
-
-- (void)outputUnit:(ORGMOutputUnit *)unit didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData;
-
-- (void)outputUnit:(ORGMOutputUnit *)unit didChangeSampleRate:(double)sampleRate;
     
 @end
 
 
+typedef void(^ORGMOutputUnitDidChangeSampleRateBlock)(double);
+
+typedef void(^ORGMOutputUnitDidRenderSoundBlock)(ORGMOutputUnit *outputUnit,AudioUnitRenderActionFlags *ioActionFlags,const AudioTimeStamp  *inTimeStamp,UInt32 inBusNumber,UInt32 inNumberFrames,AudioBufferList  *ioData);
 
 /**
  `ORGMOutputUnit` is a subclass of ORGMAudioUnit for playing converted `PCM` data through the output device. This class gets data from the converter buffer.
  */
 @interface ORGMOutputUnit : ORGMAudioUnit
+
+@property (nonatomic,copy)ORGMOutputUnitDidChangeSampleRateBlock didChangeSampleRateBlock;
+
+@property (nonatomic,copy)ORGMOutputUnitDidRenderSoundBlock didRenderSoundBlock;
 
 @property (nonatomic,weak)id<ORGMOutputUnitDelegate> outputUnitDelegate;
 

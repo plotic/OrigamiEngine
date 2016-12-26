@@ -118,6 +118,8 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     self.converter = converter;
     ORGMOutputUnit *output = [[outputUnitClass alloc] initWithConverter:self.converter];
     output.outputFormat = self.outputFormat;
+    output.didChangeSampleRateBlock = self.outputUnitDidChangeSampleRateBlock;
+    output.didRenderSoundBlock = self.outputUnitDidRenderSoundBlock;
     self.output = output;
     self.output.outputUnitDelegate = self;
     [self.output setVolume:self.volume];
@@ -196,6 +198,8 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     self.output.outputUnitDelegate = nil;
     [self.output stop];
     [self.output cancel];
+    self.output.didRenderSoundBlock = nil;
+    self.output.didChangeSampleRateBlock = nil;
     [self.converter cancel];
     [self.input cancel];
     self.input = nil;
@@ -241,15 +245,18 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     }
 }
 
-- (void)seekToTime:(double)time withDataFlush:(BOOL)flush {
+- (void)seekToTime:(double)time withDataFlush:(BOOL)flush completion:(void(^)(void))completion{
     __weak typeof (self) weakSelf = self;
     dispatch_async(self.processing_queue, ^{
         [weakSelf _seekToTime:time withDataFlush:flush];
+        if(completion){
+            completion();
+        }
     });
 }
 
 - (void)seekToTime:(double)time {
-    [self seekToTime:time withDataFlush:NO];
+    [self seekToTime:time withDataFlush:NO completion:nil];
 }
 
 - (void)_setNextUrl:(NSURL *)url withDataFlush:(BOOL)flush {
@@ -364,18 +371,6 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
                 [weakSelf.delegate engine:weakSelf didChangeReadyToPlay:readyToPlay];
             }
         });
-    }
-}
-
-- (void)outputUnit:(ORGMOutputUnit *)unit didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData{
-    if([self.delegate respondsToSelector:@selector(engine:didRenderSound:flags:timeStamp:busNumber:numberFrames:bufferList:)]){
-        [self.delegate engine:self didRenderSound:inRefCon flags:ioActionFlags timeStamp:inTimeStamp busNumber:inBusNumber numberFrames:inNumberFrames bufferList:ioData];
-    }
-}
-
-- (void)outputUnit:(ORGMOutputUnit *)unit didChangeSampleRate:(double)sampleRate{
-    if([self.delegate respondsToSelector:@selector(engine:didChangeSampleRate:)]){
-        [self.delegate engine:self didChangeSampleRate:sampleRate];
     }
 }
 

@@ -23,6 +23,7 @@
 
 #import <Foundation/Foundation.h>
 #import "ORGMAudioUnit.h"
+#import "ORGMOutputUnit.h"
 
 @protocol ORGMEngineDelegate;
 
@@ -133,7 +134,7 @@ typedef enum : NSInteger {
   @param time  Time interval offset in `seconds`;
   @param flush Defines if data should be flushed.
  */
-- (void)seekToTime:(double)time withDataFlush:(BOOL)flush;
+- (void)seekToTime:(double)time withDataFlush:(BOOL)flush completion:(void(^)(void))completion;
 
 /**
  Provides ability to seek within playing track without data flush.
@@ -162,6 +163,10 @@ typedef enum : NSInteger {
 - (BOOL)isReadyToPlay;
 
 - (void)cancelAllAndClearEngine;
+
+@property (nonatomic,copy)ORGMOutputUnitDidChangeSampleRateBlock outputUnitDidChangeSampleRateBlock;
+
+@property (nonatomic,copy)ORGMOutputUnitDidRenderSoundBlock outputUnitDidRenderSoundBlock;
 
 @end
 
@@ -197,9 +202,5 @@ typedef enum : NSInteger {
 - (void)engine:(ORGMEngine *)engine didChangeReadyToPlay:(BOOL)readyToPlay;
 
 - (void)engine:(ORGMEngine *)engine didChangeCurrentURL:(NSURL *)currentURL prevItemURL:(NSURL *)prevURL;
-
-- (void)engine:(ORGMEngine *)engine didRenderSound:(void *)inRefCon flags:(AudioUnitRenderActionFlags *)ioActionFlags timeStamp:(const AudioTimeStamp  *)inTimeStamp busNumber:(UInt32)inBusNumber numberFrames:(UInt32)inNumberFrames bufferList:(AudioBufferList  *)ioData;
-
-- (void)engine:(ORGMEngine *)engine didChangeSampleRate:(double)sampleRate;
 
 @end
