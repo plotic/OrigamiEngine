@@ -38,7 +38,7 @@
     long totalFrames;
 }
 
-@property (strong, nonatomic) NSMutableDictionary *decoderMetadata;
+@property (strong, atomic) NSMutableDictionary *decoderMetadata;
 @property (strong, nonatomic) id<ORGMSource> source;
 @property (assign, nonatomic) BOOL endOfStream;
 
@@ -318,31 +318,44 @@ FLAC__StreamDecoderWriteStatus WriteCallback(const FLAC__StreamDecoder *decoder,
 void MetadataCallback(const FLAC__StreamDecoder *decoder,
                       const FLAC__StreamMetadata *metadata,
                       void *client_data) {
+
     if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
-        FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
-        FLAC__StreamMetadata_VorbisComment comment = metadata->data.vorbis_comment;
-        FLAC__uint32 count = metadata->data.vorbis_comment.num_comments;
-        for (int i = 0; i < count; i++) {
-            NSString *commentValue = [NSString stringWithUTF8String:(const char*)comment.comments[i].entry];
-            NSRange range = [commentValue rangeOfString:@"="];
-            NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
-            NSString *value = [commentValue substringWithRange:NSMakeRange(range.location + 1,
-                                                                           commentValue.length - range.location - 1)];
-            [flacDecoder.decoderMetadata setObject:value forKey:[key lowercaseString]];
+        @autoreleasepool {
+            FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
+            FLAC__StreamMetadata_VorbisComment comment = metadata->data.vorbis_comment;
+            FLAC__uint32 count = metadata->data.vorbis_comment.num_comments;
+            for (int i = 0; i < count; i++) {
+                if(comment.comments[i].length>0){
+                    NSString *commentValue = [NSString stringWithUTF8String:(const char*)comment.comments[i].entry];
+                    NSRange range = [commentValue rangeOfString:@"="];
+                    if(range.location!=NSNotFound){
+                        NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
+                        NSString *value = [commentValue substringWithRange:NSMakeRange(range.location + 1,
+                                                                                       commentValue.length - range.location - 1)];
+                        if(key!=nil && value!=nil){
+                            [flacDecoder.decoderMetadata setObject:value forKey:[key lowercaseString]];
+                        }
+                    }
+                }
+            }
         }
     } else if (metadata->type == FLAC__METADATA_TYPE_PICTURE) {
-        FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
-        FLAC__StreamMetadata_Picture picture = metadata->data.picture;
-        NSData *picture_data = [NSData dataWithBytes:picture.data
-                                              length:picture.data_length];
-        [flacDecoder.decoderMetadata setObject:picture_data forKey:@"picture"];
+        @autoreleasepool {
+            FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
+            FLAC__StreamMetadata_Picture picture = metadata->data.picture;
+            if(picture.data_length>0){
+                NSData *picture_data = [NSData dataWithBytes:picture.data
+                                                      length:picture.data_length];
+                if(picture_data){
+                    [flacDecoder.decoderMetadata setObject:picture_data forKey:@"picture"];
+                }
+            }
+        }
     } else if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
         FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
-
         flacDecoder->channels = metadata->data.stream_info.channels;
         flacDecoder->frequency = metadata->data.stream_info.sample_rate;
         flacDecoder->bitsPerSample = metadata->data.stream_info.bits_per_sample;
-        
         flacDecoder->totalFrames = (long)metadata->data.stream_info.total_samples;
     }
 }

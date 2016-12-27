@@ -186,7 +186,7 @@
         @try {
             NSDictionary *meta = [self.decoder metadata];
             if([meta count]>0){
-                _decoderMetadata = meta;
+                _decoderMetadata = [meta copy];
             }
         } @catch (NSException *exception) {}
     }

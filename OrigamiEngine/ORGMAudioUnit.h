@@ -28,7 +28,7 @@
 // default reading chunk size
 #define CHUNK_SIZE 16 * 1024
 // deault buffer size
-#define BUFFER_SIZE 256 * 1024
+#define BUFFER_SIZE 32 * 1024
 
 /**
  Specifies format of the PCM output

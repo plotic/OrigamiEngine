@@ -29,7 +29,7 @@
     long totalFrames;
 }
 
-@property (strong, nonatomic) NSMutableDictionary *metadata;
+@property (strong, atomic) NSMutableDictionary *decoderMetadata;
 @property (strong, nonatomic) id<ORGMSource> source;
 
 @end
@@ -58,8 +58,8 @@
             nil];
 }
 
-- (NSMutableDictionary *)metadata {
-    return _metadata;
+- (NSDictionary *)metadata {
+    return self.decoderMetadata;
 }
 
 - (int)readAudio:(void *)buffer frames:(UInt32)frames {
@@ -72,7 +72,7 @@
 
 - (BOOL)open:(id<ORGMSource>)s {
     [self setSource:s];
-    self.metadata = [NSMutableDictionary dictionary];
+    self.decoderMetadata = [NSMutableDictionary dictionary];
 
     OpusFileCallbacks callbacks = {
         ReadCallback,
@@ -113,22 +113,27 @@
         NSString *commentValue = [NSString stringWithUTF8String:comment];
 
         NSRange range = [commentValue rangeOfString:@"="];
-        NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
-        NSString *value = [commentValue substringWithRange:
-            NSMakeRange(range.location + 1, commentValue.length - range.location - 1)];
+        
+        if(range.location!=NSNotFound){
+            NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
+            NSString *value = [commentValue substringWithRange:
+                NSMakeRange(range.location + 1, commentValue.length - range.location - 1)];
 
-        if ([key isEqualToString:@"METADATA_BLOCK_PICTURE"])
-        {
-            OpusPictureTag picture;
-            if (!(opus_picture_tag_parse(&picture, comment))) // 0 on success
+            if ([key isEqualToString:@"METADATA_BLOCK_PICTURE"])
             {
-                NSData *picture_data = [NSData dataWithBytes:picture.data length:picture.data_length];
-                [_metadata setObject:picture_data forKey:@"picture"];
-                opus_picture_tag_clear(&picture);
+                OpusPictureTag picture;
+                if (!(opus_picture_tag_parse(&picture, comment))) // 0 on success
+                {
+                    NSData *picture_data = [NSData dataWithBytes:picture.data length:picture.data_length];
+                    if(picture_data){
+                        [self.decoderMetadata setObject:picture_data forKey:@"picture"];
+                    }
+                    opus_picture_tag_clear(&picture);
+                }
             }
-        }
-        else {
-            [_metadata setObject:value forKey:[key lowercaseString]];
+            else if (value!=nil && key!=nil){
+                [self.decoderMetadata setObject:value forKey:[key lowercaseString]];
+            }
         }
     }
 }
