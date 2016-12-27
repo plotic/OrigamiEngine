@@ -320,35 +320,31 @@ void MetadataCallback(const FLAC__StreamDecoder *decoder,
                       void *client_data) {
 
     if (metadata->type == FLAC__METADATA_TYPE_VORBIS_COMMENT) {
-        @autoreleasepool {
-            FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
-            FLAC__StreamMetadata_VorbisComment comment = metadata->data.vorbis_comment;
-            FLAC__uint32 count = metadata->data.vorbis_comment.num_comments;
-            for (int i = 0; i < count; i++) {
-                if(comment.comments[i].length>0){
-                    NSString *commentValue = [NSString stringWithUTF8String:(const char*)comment.comments[i].entry];
-                    NSRange range = [commentValue rangeOfString:@"="];
-                    if(range.location!=NSNotFound){
-                        NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
-                        NSString *value = [commentValue substringWithRange:NSMakeRange(range.location + 1,
-                                                                                       commentValue.length - range.location - 1)];
-                        if(key!=nil && value!=nil){
-                            [flacDecoder.decoderMetadata setObject:value forKey:[key lowercaseString]];
-                        }
+        FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
+        FLAC__StreamMetadata_VorbisComment comment = metadata->data.vorbis_comment;
+        FLAC__uint32 count = metadata->data.vorbis_comment.num_comments;
+        for (int i = 0; i < count; i++) {
+            if(comment.comments[i].length>0){
+                NSString *commentValue = [NSString stringWithUTF8String:(const char*)comment.comments[i].entry];
+                NSRange range = [commentValue rangeOfString:@"="];
+                if(range.location!=NSNotFound){
+                    NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
+                    NSString *value = [commentValue substringWithRange:NSMakeRange(range.location + 1,
+                                                                                   commentValue.length - range.location - 1)];
+                    if(key!=nil && value!=nil){
+                        [flacDecoder.decoderMetadata setObject:value forKey:[key lowercaseString]];
                     }
                 }
             }
         }
     } else if (metadata->type == FLAC__METADATA_TYPE_PICTURE) {
-        @autoreleasepool {
-            FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
-            FLAC__StreamMetadata_Picture picture = metadata->data.picture;
-            if(picture.data_length>0){
-                NSData *picture_data = [NSData dataWithBytes:picture.data
-                                                      length:picture.data_length];
-                if(picture_data){
-                    [flacDecoder.decoderMetadata setObject:picture_data forKey:@"picture"];
-                }
+        FlacDecoder *flacDecoder = (__bridge FlacDecoder *)client_data;
+        FLAC__StreamMetadata_Picture picture = metadata->data.picture;
+        if(picture.data_length>0){
+            NSData *picture_data = [NSData dataWithBytes:picture.data
+                                                  length:picture.data_length];
+            if(picture_data){
+                [flacDecoder.decoderMetadata setObject:picture_data forKey:@"picture"];
             }
         }
     } else if (metadata->type == FLAC__METADATA_TYPE_STREAMINFO) {
