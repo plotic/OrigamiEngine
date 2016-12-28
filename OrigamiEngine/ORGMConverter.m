@@ -33,7 +33,7 @@
 }
 
 @property (strong, nonatomic) ORGMInputUnit *inputUnit;
-@property (weak, nonatomic) ORGMOutputUnit *outputUnit;
+@property (weak,   nonatomic) ORGMOutputUnit *outputUnit;
 @property (strong, nonatomic) NSMutableData *convertedData;
 @property (strong, nonatomic) dispatch_source_t buffering_source;
 @property (assign, nonatomic) void *callbackBuffer;
@@ -58,9 +58,11 @@
 - (void)dealloc {
     if(self.callbackBuffer!=NULL){
         free(self.callbackBuffer);
+        self.callbackBuffer=NULL;
     }
     if(self.writeBuf!=NULL){
         free(self.writeBuf);
+        self.writeBuf=NULL;
     }
     @try {
         [self.inputUnit close];
@@ -72,7 +74,7 @@
 
 - (BOOL)setupWithOutputUnit:(ORGMOutputUnit *)outputUnit {
     self.outputUnit = outputUnit;
-    [_outputUnit setSampleRate:_inputFormat.mSampleRate];
+    [self.outputUnit setSampleRate:_inputFormat.mSampleRate];
 
     _outputFormat = outputUnit.format;
     self.callbackBuffer = malloc((CHUNK_SIZE/_outputFormat.mBytesPerFrame) * _inputFormat.mBytesPerPacket);
@@ -110,7 +112,7 @@
         if(self.isCancelled){
             break;
         }
-        if (_convertedData.length >= BUFFER_SIZE) {
+        if (self.convertedData.length >= BUFFER_SIZE) {
             break;
         }
         amountConverted = [self convert:self.writeBuf amount:CHUNK_SIZE];
@@ -124,7 +126,7 @@
         return;
     }
     
-    if (!_outputUnit.isProcessing) {
+    if (!self.outputUnit.isProcessing) {
         if (_convertedData.length < BUFFER_SIZE) {
             dispatch_source_merge_data(self.buffering_source, 1);
             return;
@@ -193,7 +195,9 @@
     if (err == kAudioConverterErr_InvalidInputSize)	{
         amountRead += [self convert:dest + amountRead amount:amount - amountRead];
     }
-
+    if(self.outputUnit.didConvertSoundBlock){
+        self.outputUnit.didConvertSoundBlock(self.outputUnit,ioNumberFrames,&ioData);
+    }
     return amountRead;
 }
 

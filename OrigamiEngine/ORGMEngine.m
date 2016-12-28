@@ -119,6 +119,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     ORGMOutputUnit *output = [[outputUnitClass alloc] initWithConverter:self.converter];
     output.outputFormat = self.outputFormat;
     output.didChangeSampleRateBlock = self.outputUnitDidChangeSampleRateBlock;
+    output.didConvertSoundBlock = self.outputUnitDidConvertSoundBlock;
     output.didRenderSoundBlock = self.outputUnitDidRenderSoundBlock;
     self.output = output;
     self.output.outputUnitDelegate = self;
@@ -199,6 +200,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     [self.output stop];
     [self.output cancel];
     self.output.didRenderSoundBlock = nil;
+    self.output.didConvertSoundBlock = nil;
     self.output.didChangeSampleRateBlock = nil;
     [self.converter cancel];
     [self.input cancel];
@@ -296,14 +298,6 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
 
 #pragma mark - private
 
-- (void)observeValueForKeyPath:(NSString *)keyPath
-                      ofObject:(id)object
-                        change:(NSDictionary *)change
-                       context:(void *)context {
-    
-    
-}
-
 - (void)clearBufferingSourceHandler{
     if(_bufferingSourceHandlerState!=ORGMEngineBufferingSourceStateDisabled){
         if(self.buffering_source!=NULL){
@@ -371,6 +365,16 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
                 [weakSelf.delegate engine:weakSelf didChangeReadyToPlay:readyToPlay];
             }
         });
+        if(unit.converter.inputUnit.endOfInput){
+            NSURL *currentURL = self.currentURL;
+            __weak typeof (self) weakSelf = self;
+            dispatch_async(self.callback_queue, ^{
+                if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
+                    [weakSelf.delegate engine:weakSelf didChangeCurrentURL:nil prevItemURL:currentURL];
+                }
+            });
+            [self stop];
+        }
     }
 }
 
@@ -380,21 +384,11 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
         return;
     }
     if (unit!=nil && self.input!=nil && unit==self.input) {
-        NSURL *currentURL = self.currentURL;
         NSURL *nextUrl = nil;
         if([self.delegate respondsToSelector:@selector(engineExpectsNextUrl:)]){
             nextUrl = [self.delegate engineExpectsNextUrl:self];
         }
-        if (nextUrl==nil) {
-            __weak typeof (self) weakSelf = self;
-            dispatch_async(self.callback_queue, ^{
-                if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
-                    [weakSelf.delegate engine:weakSelf didChangeCurrentURL:nil prevItemURL:currentURL];
-                }
-            });
-            [self stop];
-        }
-        else{
+        if (nextUrl!=nil) {
             [self setNextUrl:nextUrl withDataFlush:NO];
         }
     }

@@ -51,7 +51,6 @@
         self.converter = converter;
         _amountPlayed = 0;
         _processing = NO;
-
     }
     return self;
 }
@@ -77,12 +76,10 @@
     }
     
     NSParameterAssert(_outputUnit!=NULL);
-    //dispatch_async(dispatch_get_main_queue(), ^{
-        if(_outputUnit!=NULL){
-            AudioOutputUnitStart(_outputUnit);
-            _processing = YES;
-        }
-    //});
+    if(_outputUnit!=NULL){
+        AudioOutputUnitStart(_outputUnit);
+        _processing = YES;
+    }
 }
 
 - (void)pause {
@@ -161,11 +158,9 @@
                              size);
     }
     [self setFormat:&_format];
-    
     if(self.didChangeSampleRateBlock){
         self.didChangeSampleRateBlock(sampleRate);
     }
-    
 }
 
 #pragma mark - callbacks
@@ -235,7 +230,7 @@ static OSStatus Sound_Renderer(void *inRefCon,
         return NO;
     }
 
-    if (AudioComponentInstanceNew(comp, &_outputUnit)) {
+    if (AudioComponentInstanceNew(comp, &_outputUnit) != noErr) {
         _outputUnit = NULL;
         return NO;
     }
@@ -269,7 +264,6 @@ static OSStatus Sound_Renderer(void *inRefCon,
         return NO;
     }
 
-    
     deviceFormat.mChannelsPerFrame = 2;
     
     deviceFormat.mFormatFlags &= ~kLinearPCMFormatFlagIsNonInterleaved;
@@ -318,10 +312,10 @@ static OSStatus Sound_Renderer(void *inRefCon,
         return 0;
     }
     if (self.converter) {
-        int bytesRead = [_converter shiftBytes:amount buffer:ptr];
+        int bytesRead = [self.converter shiftBytes:amount buffer:ptr];
         _amountPlayed += bytesRead;
-        if ([_converter isReadyForBuffering]) {
-            dispatch_source_merge_data(_converter.buffering_source, 1);
+        if ([self.converter isReadyForBuffering]) {
+            dispatch_source_merge_data(self.converter.buffering_source, 1);
         }
         return bytesRead;
     }

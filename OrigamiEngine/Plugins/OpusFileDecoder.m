@@ -24,18 +24,16 @@
 #import "OpusFileDecoder.h"
 #import <opusfile/opusfile.h>
 
-@interface OpusFileDecoder () {
-    OggOpusFile *decoder;
-    long totalFrames;
-}
+@interface OpusFileDecoder ()
 
 @property (strong, atomic) NSMutableDictionary *decoderMetadata;
 @property (strong, nonatomic) id<ORGMSource> source;
+@property (assign, nonatomic) int64_t totalFrames;
+@property (assign, nonatomic) OggOpusFile *decoder;
 
 @end
 
 @implementation OpusFileDecoder
-@synthesize source;
 
 - (void)dealloc {
     [self close];
@@ -52,8 +50,8 @@
             [NSNumber numberWithInt:2], @"channels",
             [NSNumber numberWithInt:16], @"bitsPerSample",
             [NSNumber numberWithFloat:48000], @"sampleRate",
-            [NSNumber numberWithDouble:totalFrames], @"totalFrames",
-            [NSNumber numberWithBool:[source seekable]], @"seekable",
+            [NSNumber numberWithDouble:_totalFrames], @"totalFrames",
+            [NSNumber numberWithBool:[self.source seekable]], @"seekable",
             @"little", @"endian",
             nil];
 }
@@ -63,79 +61,72 @@
 }
 
 - (int)readAudio:(void *)buffer frames:(UInt32)frames {
-    int samples = op_read_stereo(decoder, (opus_int16 *)buffer, frames);
-
+    int samples = op_read_stereo(self.decoder, (opus_int16 *)buffer, frames);
     if (samples < 0) return 0;
-
     return samples;
 }
 
 - (BOOL)open:(id<ORGMSource>)s {
     [self setSource:s];
     self.decoderMetadata = [NSMutableDictionary dictionary];
-
     OpusFileCallbacks callbacks = {
         ReadCallback,
         SeekCallback,
         TellCallback,
         0
     };
-
     int rc;
-    decoder = op_open_callbacks((__bridge void *)(source), &callbacks, NULL, 0, &rc);
-
-    if (rc != 0) return NO;
-    
-    totalFrames = (long)op_pcm_total(decoder, -1);
+    self.decoder = op_open_callbacks((__bridge void *)(self.source), &callbacks, NULL, 0, &rc);
+    if (rc != 0) {
+        return NO;
+    }
+    self.totalFrames = (long)op_pcm_total(self.decoder, -1);
     [self parseMetadata];
-    
     return YES;
 }
 
 - (long)seek:(long)sample {
-	return op_pcm_seek(decoder, sample);
+	return op_pcm_seek(self.decoder, sample);
 }
 
 - (void)close {
-    [source close];
-    op_free(decoder);
-	decoder = NULL;
+    [self.source close];
+    if(self.decoder!=NULL){
+        op_free(self.decoder);
+        self.decoder = NULL;
+    }
 }
 
 #pragma mark - private
 
 - (void)parseMetadata {
-
-    const OpusTags *tags = op_tags(decoder, -1);
-    for (int i = 0; i < tags->comments; i++) {
-
-        const char *comment = tags->user_comments[i];
-        NSString *commentValue = [NSString stringWithUTF8String:comment];
-
-        NSRange range = [commentValue rangeOfString:@"="];
-        
-        if(range.location!=NSNotFound){
-            NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
-            NSString *value = [commentValue substringWithRange:
-                NSMakeRange(range.location + 1, commentValue.length - range.location - 1)];
-
-            if ([key isEqualToString:@"METADATA_BLOCK_PICTURE"])
-            {
-                OpusPictureTag picture;
-                if (!(opus_picture_tag_parse(&picture, comment))) // 0 on success
-                {
-                    NSData *picture_data = [NSData dataWithBytes:picture.data length:picture.data_length];
-                    if(picture_data){
-                        [self.decoderMetadata setObject:picture_data forKey:@"picture"];
+    @try {
+        const OpusTags *tags = op_tags(self.decoder, -1);
+        for (int i = 0; i < tags->comments; i++) {
+            const char *comment = tags->user_comments[i];
+            NSString *commentValue = [NSString stringWithUTF8String:comment];
+            NSRange range = [commentValue rangeOfString:@"="];
+            if(range.location!=NSNotFound){
+                NSString *key = [commentValue substringWithRange:NSMakeRange(0, range.location)];
+                NSString *value = [commentValue substringWithRange:
+                                   NSMakeRange(range.location + 1, commentValue.length - range.location - 1)];
+                if ([key isEqualToString:@"METADATA_BLOCK_PICTURE"]){
+                    OpusPictureTag picture;
+                    if (!(opus_picture_tag_parse(&picture, comment))) // 0 on success
+                    {
+                        NSData *picture_data = [NSData dataWithBytes:picture.data length:picture.data_length];
+                        if(picture_data){
+                            [self.decoderMetadata setObject:picture_data forKey:@"picture"];
+                        }
+                        opus_picture_tag_clear(&picture);
                     }
-                    opus_picture_tag_clear(&picture);
+                }
+                else if (value!=nil && key!=nil){
+                    [self.decoderMetadata setObject:value forKey:[key lowercaseString]];
                 }
             }
-            else if (value!=nil && key!=nil){
-                [self.decoderMetadata setObject:value forKey:[key lowercaseString]];
-            }
         }
-    }
+    } @catch (NSException *exception) {}
 }
 
 #pragma mark - callback

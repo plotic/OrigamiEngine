@@ -168,6 +168,8 @@ typedef enum : NSInteger {
 
 @property (nonatomic,copy)ORGMOutputUnitDidRenderSoundBlock outputUnitDidRenderSoundBlock;
 
+@property (nonatomic,copy)ORGMOutputUnitDidConvertSoundBlock outputUnitDidConvertSoundBlock;
+
 @end
 
 /**

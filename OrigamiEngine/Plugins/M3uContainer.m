@@ -76,7 +76,6 @@
 	if (protocolRange.location != NSNotFound) {
 		return [NSURL URLWithString:path];
 	}
-    
     NSURL *baseUrl = [baseFileUrl URLByDeletingLastPathComponent];
 	return [baseUrl URLByAppendingPathComponent:path];
 }

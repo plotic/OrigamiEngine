@@ -52,7 +52,7 @@
         self.lock_queue = dispatch_queue_create("com.origami.lock",DISPATCH_QUEUE_SERIAL);
         self.data = [[NSMutableData alloc] init];
         self.inputBuffer = malloc(CHUNK_SIZE);
-        _endOfInput = NO;
+        self.endOfInput = NO;
         _processing = NO;
     }
     return self;
@@ -61,7 +61,10 @@
 - (void)dealloc {
     self.inputUnitDelegate = nil;
     [self close];
-    free(self.inputBuffer);
+    if(self.inputBuffer!=NULL){
+        free(self.inputBuffer);
+        self.inputBuffer = NULL;
+    }
     self.source.sourceDelegate = nil;
     self.url = nil;
 }
@@ -86,6 +89,7 @@
     int bitsPerSample = [[_decoder.properties objectForKey:@"bitsPerSample"] intValue];
 	int channels = [[_decoder.properties objectForKey:@"channels"] intValue];
     bytesPerFrame = (bitsPerSample/8) * channels;
+    self.endOfInput = NO;
     return YES;
 }
 
@@ -103,8 +107,8 @@
 }
 
 - (void)close {
-    [_source close];
-    [_decoder close];
+    [self.source close];
+    [self.decoder close];
 }
 
 - (void)process {
@@ -125,20 +129,20 @@
             return;
         }
         
-        if (_data.length >= BUFFER_SIZE) {
+        if (self.data.length >= BUFFER_SIZE) {
             framesRead = 1;
             break;
         }
 
         if (_shouldSeek) {
-            [_decoder seek:seekFrame];
+            [self.decoder seek:seekFrame];
             _shouldSeek = NO;
         }
         int framesToRead = 0;
         if(bytesPerFrame>0){
             framesToRead = CHUNK_SIZE/bytesPerFrame;
         }
-        framesRead = [_decoder readAudio:self.inputBuffer frames:framesToRead];
+        framesRead = [self.decoder readAudio:self.inputBuffer frames:framesToRead];
         amountInBuffer = (framesRead * bytesPerFrame);
 
         __weak typeof (self) weakSelf = self;
@@ -148,12 +152,12 @@
     } while (framesRead > 0 && self.isCancelled==NO);
 
     if (framesRead <= 0 && self.isCancelled==NO) {
-        [self setEndOfInput:YES];
+        self.endOfInput = YES;
         if([self.inputUnitDelegate respondsToSelector:@selector(inputUnitDidEndOfInput:)]){
             [self.inputUnitDelegate inputUnitDidEndOfInput:self];
         }
     }
-
+    
     _processing = NO;
 }
 
