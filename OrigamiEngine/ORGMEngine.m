@@ -47,6 +47,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
 @property (assign, nonatomic) ORGMEngineState currentState;
 @property (strong, nonatomic) NSError *currentError;
 @property (assign, nonatomic) float lastPreloadProgress;
+@property (strong, nonatomic) NSURL *prevURL;
 @property (strong, nonatomic) dispatch_queue_t callback_queue;
 @property (strong, nonatomic) dispatch_queue_t processing_queue;
 @property (strong, nonatomic) dispatch_source_t buffering_source;
@@ -132,12 +133,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
                                                         NSLocalizedString(@"Couldn't setup converter", nil) }];
         return;
     }
-    __weak typeof (self) weakSelf = self;
-    dispatch_async(self.callback_queue, ^{
-        if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
-            [weakSelf.delegate engine:weakSelf didChangeCurrentURL:url prevItemURL:nil];
-        }
-    });
+    [self didChangeCurrentURL:url prevURL:nil];
     [self setCurrentState:ORGMEngineStatePlaying];
     [self setBufferingSourceHandler];
     dispatch_source_merge_data(self.buffering_source, 1);
@@ -148,6 +144,16 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
     __weak typeof (self) weakSelf = self;
     dispatch_async(self.processing_queue, ^{
         [weakSelf _playUrl:url withOutputUnitClass:outputUnitClass];
+    });
+}
+
+- (void)didChangeCurrentURL:(NSURL *)currentURL prevURL:(NSURL *)prevURL{
+    __weak typeof (self) weakSelf = self;
+    self.prevURL = prevURL;
+    dispatch_async(self.callback_queue, ^{
+        if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
+            [weakSelf.delegate engine:weakSelf didChangeCurrentURL:currentURL prevItemURL:prevURL];
+        }
     });
 }
 
@@ -277,12 +283,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
         else{
             [self.converter reinitWithNewInput:self.input withDataFlush:flush];
             [self.output seek:0.0]; //to reset amount played
-             __weak typeof (self) weakSelf = self;
-            dispatch_async(self.callback_queue, ^{
-                if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
-                    [weakSelf.delegate engine:weakSelf didChangeCurrentURL:url prevItemURL:prevURL];
-                }
-            });
+            [self didChangeCurrentURL:url prevURL:prevURL];
             [self setCurrentState:ORGMEngineStatePlaying]; //trigger delegate method
             self.input.inputUnitDelegate = self;
         }
@@ -367,12 +368,7 @@ typedef NS_ENUM(NSUInteger, ORGMEngineBufferingSourceState) {
         });
         if(unit.converter.inputUnit.endOfInput){
             NSURL *currentURL = self.currentURL;
-            __weak typeof (self) weakSelf = self;
-            dispatch_async(self.callback_queue, ^{
-                if([weakSelf.delegate respondsToSelector:@selector(engine:didChangeCurrentURL:prevItemURL:)]) {
-                    [weakSelf.delegate engine:weakSelf didChangeCurrentURL:nil prevItemURL:currentURL];
-                }
-            });
+            [self didChangeCurrentURL:nil prevURL:currentURL];
             [self stop];
         }
     }

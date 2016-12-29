@@ -158,6 +158,8 @@ typedef enum : NSInteger {
 
 - (NSURL *)currentURL;
 
+- (NSURL *)prevURL;
+
 - (float)preloadProgress;
 
 - (BOOL)isReadyToPlay;
