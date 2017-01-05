@@ -271,15 +271,14 @@ const int ID3V1_SIZE = 128;
     //  Toll free bridge the CFDictionary so that we can interact with it via objc
     NSDictionary* nsDict = (__bridge NSDictionary*)piDict;
     
-    //  ALWAYS CLEAN UP!
-    CFRelease(piDict);
-    
     NSMutableDictionary *result = [[NSMutableDictionary alloc] init];
     if([nsDict count]>0){
         [result addEntriesFromDictionary:nsDict];
     }
     nsDict = nil;
     free(rawID3Tag);
+
+    CFRelease(piDict);
     
     return result;
 }
